@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Typing Coach — Positive AI Feedback</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#34d399;--danger:#fb7185}
+    *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    body{margin:0;background:linear-gradient(180deg,#071025 0%, #081226 100%);color:#e6eef6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.04);width:960px;max-width:100%;border-radius:12px;padding:20px;box-shadow:0 10px 30px rgba(2,6,23,0.6)}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    h1{font-size:18px;margin:0}
+    .controls{display:flex;gap:8px;align-items:center}
+    select,button{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit;padding:8px 10px;border-radius:8px}
+    .main{display:grid;grid-template-columns:1fr 300px;gap:16px}
+    .target{background:rgba(255,255,255,0.02);padding:14px;border-radius:10px;min-height:140px}
+    .sentence{font-size:20px;line-height:1.6;word-wrap:break-word}
+    .input-area{margin-top:12px}
+    textarea{width:100%;min-height:120px;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:16px}
+    .stats{display:flex;flex-direction:column;gap:12px}
+    .stat-row{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:8px;background:rgba(255,255,255,0.015)}
+    .stat-number{font-weight:700;font-size:20px}
+    .feedback{padding:12px;border-radius:8px;background:linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));min-height:72px}
+    .positive{color:var(--accent);font-weight:700}
+    .negative{color:var(--danger);font-weight:700}
+    .small{font-size:13px;color:var(--muted)}
+    .word-highlight-correct{color:#7fffd4}
+    .word-highlight-wrong{color:#ff9aa2;text-decoration:underline}
+    .controls-row{display:flex;gap:8px;flex-wrap:wrap}
+    footer{margin-top:12px;text-align:right;color:var(--muted);font-size:13px}
+    .progress-bar{height:8px;background:rgba(255,255,255,0.03);border-radius:999px;overflow:hidden}
+    .progress-bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#60a5fa);width:0%}
+    .history-list{max-height:220px;overflow:auto;padding:6px;display:flex;flex-direction:column;gap:8px}
+    .history-item{padding:8px;border-radius:8px;background:rgba(255,255,255,0.01);font-size:13px}
+    .btn-ghost{background:transparent;border:1px dashed rgba(255,255,255,0.03)}
+    .tag{padding:4px 8px;border-radius:999px;background:rgba(255,255,255,0.02);font-size:12px}
+    @media (max-width:880px){.main{grid-template-columns:1fr;}.stats{order:2}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <header>
+      <h1>Typing Coach — Positive AI Feedback</h1>
+      <div class="controls">
+        <div class="controls-row">
+          <select id="presetSelect" title="Choose a sentence/preset">
+            <option value="random">Random sentences</option>
+            <option value="practice">Practice: common words</option>
+            <option value="quote">Quote: short</option>
+          </select>
+          <button id="newBtn">New</button>
+          <button id="resetBtn">Reset</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="main">
+      <div>
+        <div class="target">
+          <div class="small">Type the text below (correct letters turn <span class="tag">green</span>, wrong letters turn <span class="tag">red</span>)</div>
+          <div id="sentenceDisplay" class="sentence" aria-live="polite"></div>
+
+          <div class="input-area">
+            <textarea id="inputBox" placeholder="Start typing here..." spellcheck="false" autocorrect="off" autocomplete="off"></textarea>
+          </div>
+
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center;justify-content:space-between">
+            <div class="progress-bar" aria-hidden="true"><i id="progressFill"></i></div>
+            <div class="small" id="timeLeft">00:00</div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;justify-content:space-between">
+          <div class="small">Hints: Type accurately, keep a steady rhythm, and breathe. Basic AI feedback will suggest targeted practice after each run.</div>
+          <div class="small">Saved locally in browser.</div>
+        </div>
+      </div>
+
+      <aside class="stats">
+        <div class="stat-row">
+          <div>
+            <div class="small">WPM</div>
+            <div class="stat-number" id="wpm">0</div>
+          </div>
+          <div>
+            <div class="small">Accuracy</div>
+            <div class="stat-number" id="accuracy">100%</div>
+          </div>
+        </div>
+
+        <div class="stat-row">
+          <div>
+            <div class="small">Time</div>
+            <div class="stat-number" id="time">00:00</div>
+          </div>
+          <div>
+            <div class="small">Typed</div>
+            <div class="stat-number" id="typedCount">0</div>
+          </div>
+        </div>
+
+        <div class="feedback" id="aiFeedback" aria-live="polite">
+          <div class="small">AI Feedback</div>
+          <div id="feedbackText" style="margin-top:8px;font-weight:700">Be accurate, then speed will follow — you got this!</div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button id="finishBtn">Finish</button>
+          <button id="saveBtn" class="btn-ghost">Save run</button>
+        </div>
+
+        <div style="margin-top:6px">
+          <div class="small">Session history</div>
+          <div class="history-list" id="historyList"></div>
+        </div>
+      </aside>
+    </div>
+
+    <footer>
+      Built with a little friendly "AI" (rule-based feedback). Want more features? Ask me to add custom drills, multiplayer, or analytics.
+    </footer>
+  </div>
+
+  <script>
+    // Basic data: sentence pools
+    const pools = {
+      random: [
+        "Practice makes progress: keep your eyes on the screen and your fingers moving.",
+        "The quick brown fox jumps over the lazy dog.",
+        "Typing fast is useful, but typing accurately is the real superpower.",
+        "Consistency beats intensity: ten minutes a day will show big gains over time.",
+        "Small mistakes reveal what to practice next — focus on those letters and words." 
+      ],
+      practice: [
+        "about above across after again against almost along already.",
+        "because before between both bring build busy buy.",
+        "people place point power problem present program project.",
+      ],
+      quote: [
+        "Simplicity is the ultimate sophistication.",
+        "Perseverance is failing 19 times and succeeding the 20th.",
+        "Small progress is still progress."
+      ]
+    };
+
+    // UI elements
+    const sentenceDisplay = document.getElementById('sentenceDisplay');
+    const inputBox = document.getElementById('inputBox');
+    const wpmEl = document.getElementById('wpm');
+    const accuracyEl = document.getElementById('accuracy');
+    const timeEl = document.getElementById('time');
+    const typedCountEl = document.getElementById('typedCount');
+    const feedbackText = document.getElementById('feedbackText');
+    const progressFill = document.getElementById('progressFill');
+    const historyList = document.getElementById('historyList');
+    const presetSelect = document.getElementById('presetSelect');
+
+    const newBtn = document.getElementById('newBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const finishBtn = document.getElementById('finishBtn');
+    const saveBtn = document.getElementById('saveBtn');
+
+    let target = '';
+    let startTime = null;
+    let timerInterval = null;
+    let isFinished = false;
+
+    // load history from localStorage
+    function loadHistory(){
+      const raw = localStorage.getItem('typing_history_v1');
+      const arr = raw ? JSON.parse(raw) : [];
+      renderHistory(arr);
+    }
+    function saveRunToHistory(run){
+      const raw = localStorage.getItem('typing_history_v1');
+      const arr = raw ? JSON.parse(raw) : [];
+      arr.unshift(run);
+      if(arr.length>30) arr.pop();
+      localStorage.setItem('typing_history_v1', JSON.stringify(arr));
+      renderHistory(arr);
+    }
+    function renderHistory(arr){
+      historyList.innerHTML = '';
+      if(!arr || arr.length===0){ historyList.innerHTML = '<div class="small">No runs yet. Save a run to build history.</div>'; return; }
+      arr.forEach(r=>{
+        const el = document.createElement('div'); el.className='history-item';
+        el.innerHTML = `<div style=\"display:flex;justify-content:space-between\"><div style=\"font-weight:700\">${r.wpm} WPM</div><div class=\"small\">${r.accuracy}%</div></div><div class=\"small\">${r.time} — ${r.preview}</div>`;
+        historyList.appendChild(el);
+      });
+    }
+
+    // choose sentence
+    function pickSentence(kind='random'){
+      const pool = pools[kind] || pools.random;
+      const s = pool[Math.floor(Math.random()*pool.length)];
+      target = s.trim();
+      renderSentence();
+    }
+
+    function renderSentence(){
+      // split into characters and wrap in spans
+      sentenceDisplay.innerHTML = '';
+      for(let i=0;i<target.length;i++){
+        const ch = target[i];
+        const span = document.createElement('span');
+        span.textContent = ch;
+        span.dataset.index = i;
+        sentenceDisplay.appendChild(span);
+      }
+    }
+
+    function reset(){
+      inputBox.value = '';
+      startTime = null; clearInterval(timerInterval); timerInterval = null; isFinished=false;
+      wpmEl.textContent='0'; accuracyEl.textContent='100%'; timeEl.textContent='00:00'; typedCountEl.textContent='0'; progressFill.style.width='0%'; feedbackText.textContent='Be accurate, then speed will follow — you got this!';
+      Array.from(sentenceDisplay.children).forEach(s=>{ s.className=''; });
+    }
+
+    // scoring & live update
+    function updateStats(){
+      const typed = inputBox.value;
+      const now = Date.now();
+      const elapsedMs = startTime ? (now - startTime) : 0;
+      const elapsedMin = Math.max(elapsedMs/60000, 1/60000); // avoid div by zero
+
+      // count correct characters up to typed length
+      let correct=0; let total=typed.length; let firstMismatch=-1;
+      for(let i=0;i<typed.length;i++){
+        if(i<target.length && typed[i]===target[i]){ correct++; }
+        else { if(firstMismatch===-1) firstMismatch=i; }
+      }
+      const acc = total===0?100: Math.round((correct/total)*100);
+
+      const chars = correct; // often WPM uses correct chars; we can use total typed for speed but correct is better
+      const wpm = Math.round((chars/5) / elapsedMin);
+
+      wpmEl.textContent = isFinite(wpm) ? Math.max(0,wpm) : '0';
+      accuracyEl.textContent = acc + '%';
+      typedCountEl.textContent = total;
+
+      // time display
+      const s = Math.floor(elapsedMs/1000);
+      timeEl.textContent = (Math.floor(s/60)).toString().padStart(2,'0') + ':' + (s%60).toString().padStart(2,'0');
+
+      // progress
+      const progress = Math.min(100, Math.round((typed.length/target.length)*100));
+      progressFill.style.width = progress + '%';
+
+      // render colored spans
+      Array.from(sentenceDisplay.children).forEach((span, idx)=>{
+        span.className='';
+        if(idx < typed.length){
+          if(typed[idx] === span.textContent){ span.classList.add('word-highlight-correct'); }
+          else { span.classList.add('word-highlight-wrong'); }
+        }
+      });
+
+      // basic 'AI' feedback (rule-based): pick tone and suggestion
+      const feedback = generateFeedback({wpm: wpm, accuracy: acc, typed: typed, correct: correct, elapsedMs: elapsedMs});
+      feedbackText.textContent = feedback.message;
+      if(feedback.tone==='positive'){ feedbackText.className='positive'; }
+      else if(feedback.tone==='neutral'){ feedbackText.className=''; }
+      else { feedbackText.className='negative'; }
+    }
+
+    // small rule-based 'AI' for feedback and short practice suggestions
+    function generateFeedback({wpm, accuracy, typed, correct, elapsedMs}){
+      // rules: consider accuracy first, then speed
+      if(typed.length===0) return {tone:'neutral', message:'Start typing to get live feedback.'};
+
+      if(accuracy >= 95 && wpm >= 50) return {tone:'positive', message:`Amazing work — ${wpm} WPM with ${accuracy}% accuracy. Try a longer passage to challenge yourself!`};
+      if(accuracy >= 95 && wpm < 50) return {tone:'positive', message:`Excellent accuracy (${accuracy}%). You can safely speed up a bit — try short bursts of 20s where you try to push pace.`};
+      if(accuracy >= 85 && accuracy < 95){
+        return {tone:'positive', message:`Solid progress: ${accuracy}% accuracy. Focus on consistency: slow down slightly to reduce mistakes and your WPM will climb.`};
+      }
+      if(accuracy < 85){
+        // find the most common incorrect character
+        const mistakes = analyzeMistakes(typed);
+        let suggest = '';
+        if(mistakes.length>0){ suggest = `Common slips: '${mistakes[0].char}' (${mistakes[0].count} times). Practice words with that letter.`; }
+        else suggest = 'Focus on accuracy — slow down and type each letter deliberately.';
+        return {tone:'negative', message:`Accuracy ${accuracy}%. ${suggest}`};
+      }
+      // fallback
+      return {tone:'neutral', message:`Keep going — ${wpm} WPM, ${accuracy}% accuracy.`};
+    }
+
+    function analyzeMistakes(typed){
+      // count mismatched characters vs target
+      const counts = {};
+      for(let i=0;i<typed.length;i++){
+        if(i<target.length && typed[i]!==target[i]){
+          const c = target[i]; counts[c] = (counts[c]||0)+1;
+        }
+      }
+      // convert to array sorted
+      const arr = Object.keys(counts).map(k=>({char:k,count:counts[k]})).sort((a,b)=>b.count-a.count);
+      return arr;
+    }
+
+    // start timer on first key
+    inputBox.addEventListener('keydown', (e)=>{
+      if(!startTime){
+        startTime = Date.now();
+        timerInterval = setInterval(updateStats, 250);
+      }
+      // if user presses Tab inside textarea, prevent leaving
+      if(e.key === 'Tab'){ e.preventDefault(); const start = inputBox.selectionStart; const end = inputBox.selectionEnd; inputBox.value = inputBox.value.substring(0,start) + '\t' + inputBox.value.substring(end); inputBox.selectionStart = inputBox.selectionEnd = start+1; }
+    });
+
+    inputBox.addEventListener('input', ()=>{
+      if(isFinished) return;
+      updateStats();
+      // auto-detect finish when typed matches target length and content
+      if(inputBox.value === target){
+        isFinished = true; clearInterval(timerInterval);
+        // final update
+        updateStats();
+        // show a celebratory message
+        setTimeout(()=>{
+          const wpm = wpmEl.textContent; const acc = accuracyEl.textContent;
+          feedbackText.textContent = `Nice! You finished — ${wpm} WPM, ${acc} accuracy. Save this run to track progress.`;
+          feedbackText.className='positive';
+        }, 150);
+      }
+    });
+
+    // button actions
+    newBtn.addEventListener('click', ()=>{ pickSentence(presetSelect.value); reset(); });
+    resetBtn.addEventListener('click', ()=>{ reset(); });
+    presetSelect.addEventListener('change', ()=>{ pickSentence(presetSelect.value); reset(); });
+
+    finishBtn.addEventListener('click', ()=>{
+      if(!startTime) { feedbackText.textContent='Type something first.'; return; }
+      isFinished = true; clearInterval(timerInterval);
+      updateStats();
+      feedbackText.textContent = 'Run finished — ' + wpmEl.textContent + ' WPM, ' + accuracyEl.textContent + ' accuracy.';
+      feedbackText.className='positive';
+    });
+
+    saveBtn.addEventListener('click', ()=>{
+      const run = {
+        time: new Date().toLocaleString(),
+        wpm: wpmEl.textContent,
+        accuracy: accuracyEl.textContent.replace('%',''),
+        preview: target.slice(0,45) + (target.length>45? '...' : '')
+      };
+      saveRunToHistory(run);
+      feedbackText.textContent = 'Run saved. Nice progress — check your history to track improvements.'; feedbackText.className='positive';
+    });
+
+    // initialize
+    pickSentence('random'); loadHistory(); reset();
+
+    // keyboard shortcuts: Ctrl+Enter to finish, Ctrl+S to save (prevents default browser save)
+    window.addEventListener('keydown', (e)=>{
+      if((e.ctrlKey||e.metaKey) && e.key === 'Enter'){ e.preventDefault(); finishBtn.click(); }
+      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 's'){ e.preventDefault(); saveBtn.click(); }
+    });
+  </script>
+</body>
+</html>
